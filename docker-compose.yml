@@ -2,6 +2,7 @@
 #   cp .env.example .env    # then edit
 #   podman-compose up --build      (docker compose up --build also works)
 # Dashboard: http://localhost:5173   API: http://localhost:8080   Merchant: http://localhost:8081
+# Host ports in use? Override: KYA_API_PORT=18080 MERCHANT_PORT=18081 podman-compose up --build
 services:
   postgres:
     image: docker.io/library/postgres:17-alpine
@@ -23,7 +24,7 @@ services:
       KYA_ADDR: ":8080"
       KYA_CORS_ORIGINS: http://localhost:5173
     depends_on: { postgres: { condition: service_healthy } }
-    ports: ["8080:8080"]
+    ports: ["${KYA_API_PORT:-8080}:8080"]
     # In shared environments mount the wallet key as a secret instead of an env var:
     #   TELEGRAPH_WALLET_KEY_FILE=/run/secrets/telegraph_wallet_key
 
@@ -36,7 +37,7 @@ services:
       MERCHANT_ADDR: ":8081"
       MERCHANT_CORS_ORIGINS: http://localhost:5173
     depends_on: [api]
-    ports: ["8081:8081"]
+    ports: ["${MERCHANT_PORT:-8081}:8081"]
 
   dashboard:
     build: { context: ., dockerfile: deploy/dashboard.Dockerfile }

@@ -13,7 +13,7 @@ podman-compose up --build  # or: docker compose up --build
 
 Open the dashboard at http://localhost:5173. In **Scenarios**, click **Run all**, then use **inspect** on any result.
 
-## Option B — native (Go 1.25+, Node 22+, optional PostgreSQL 15+)
+## Option B — native (Go 1.26+, Node 22+, optional PostgreSQL 15+)
 
 ```bash
 npm install

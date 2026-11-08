@@ -21,7 +21,7 @@ cp .env.example .env
 podman-compose up --build         # dashboard http://localhost:5173 (docker compose also works)
 ```
 
-Or natively (Go 1.25+, Node 22+):
+Or natively (Go 1.26+, Node 22+):
 
 ```bash
 npm install

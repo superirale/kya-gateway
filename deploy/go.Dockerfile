@@ -1,5 +1,5 @@
 # Builds one Go binary: APP=api | merchant-demo | telegraph-probe
-FROM docker.io/library/golang:1.25-alpine AS build
+FROM docker.io/library/golang:1.26-alpine AS build
 ARG APP=api
 WORKDIR /src
 COPY go.mod go.sum ./

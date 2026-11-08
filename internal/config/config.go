@@ -114,8 +114,11 @@ func Load() (Config, error) {
 	if c.AdminKey, err = secretFromEnv("KYA_ADMIN_KEY"); err != nil {
 		return c, err
 	}
-	if c.TelegraphWalletKey, err = secretFromEnv("TELEGRAPH_WALLET_KEY"); err != nil {
-		return c, err
+	// Only the live adapter needs (or should ever hold) the wallet key.
+	if c.TelegraphAdapter == "x402" {
+		if c.TelegraphWalletKey, err = secretFromEnv("TELEGRAPH_WALLET_KEY"); err != nil {
+			return c, err
+		}
 	}
 	seed, err := secretFromEnv("KYA_ISSUER_SEED")
 	if err != nil {
