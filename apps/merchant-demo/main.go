@@ -88,6 +88,12 @@ func main() {
 		log:        log,
 	}
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, 200, map[string]any{
+			"service":   "KYA demo merchant (JSON API; UI is the dashboard on :5173)",
+			"endpoints": []string{"GET /healthz", "GET /api/merchant", "GET /api/catalog", "POST /api/quote", "POST /api/checkout", "GET /api/orders", "GET /api/kya/..."},
+		})
+	})
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { writeJSON(w, 200, map[string]string{"status": "ok"}) })
 	mux.HandleFunc("GET /api/merchant", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, 200, map[string]any{"merchant_id": a.merchantID, "payment_mode": "SIMULATED"})
