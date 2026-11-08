@@ -1,0 +1,13 @@
+# Keep secrets and local artifacts out of image build contexts (Podman reads
+# .containerignore; Docker reads .dockerignore, a symlink to this file).
+.env
+.env.*
+!.env.example
+*.key
+.git
+node_modules
+**/node_modules
+**/dist
+bin
+coverage.out
+.DS_Store

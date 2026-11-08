@@ -1,0 +1,47 @@
+# Local, reproducible KYA stack.
+#   cp .env.example .env    # then edit
+#   podman-compose up --build      (docker compose up --build also works)
+# Dashboard: http://localhost:5173   API: http://localhost:8080   Merchant: http://localhost:8081
+services:
+  postgres:
+    image: docker.io/library/postgres:17-alpine
+    environment:
+      POSTGRES_USER: kya
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kya-local-only}
+      POSTGRES_DB: kya
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kya"]
+      interval: 3s
+      retries: 20
+
+  api:
+    build: { context: ., dockerfile: deploy/go.Dockerfile, args: { APP: api } }
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgres://kya:${POSTGRES_PASSWORD:-kya-local-only}@postgres:5432/kya?sslmode=disable
+      KYA_ADDR: ":8080"
+      KYA_CORS_ORIGINS: http://localhost:5173
+    depends_on: { postgres: { condition: service_healthy } }
+    ports: ["8080:8080"]
+    # In shared environments mount the wallet key as a secret instead of an env var:
+    #   TELEGRAPH_WALLET_KEY_FILE=/run/secrets/telegraph_wallet_key
+
+  merchant:
+    build: { context: ., dockerfile: deploy/go.Dockerfile, args: { APP: merchant-demo } }
+    environment:
+      KYA_URL: http://api:8080
+      MERCHANT_ID: merchant_demo_001
+      MERCHANT_API_KEY: ${MERCHANT_API_KEY:-local-demo-merchant-key-0001}
+      MERCHANT_ADDR: ":8081"
+      MERCHANT_CORS_ORIGINS: http://localhost:5173
+    depends_on: [api]
+    ports: ["8081:8081"]
+
+  dashboard:
+    build: { context: ., dockerfile: deploy/dashboard.Dockerfile }
+    depends_on: [api, merchant]
+    ports: ["5173:8080"]
+
+volumes:
+  pgdata:
