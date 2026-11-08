@@ -1,7 +1,12 @@
 {
   "name": "kya-gateway",
+  "license": "Apache-2.0",
   "private": true,
-  "workspaces": ["sdk/typescript", "apps/dashboard", "apps/shopping-agent"],
+  "workspaces": [
+    "sdk/typescript",
+    "apps/dashboard",
+    "apps/shopping-agent"
+  ],
   "scripts": {
     "build": "npm run build -w sdk/typescript && npm run build -w apps/dashboard",
     "test": "npm test -w sdk/typescript",

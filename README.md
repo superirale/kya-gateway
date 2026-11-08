@@ -12,7 +12,7 @@ For eligible requests it then **buys risk intelligence through Telegraph** (x402
 
 > A cryptographic identity proves key control, not real-world identity or payment authorization. Telegraph's result is a risk input, not proof of consent. Merchandise checkout in this demo is **simulated**.
 
-PRD: [docs/KYA_Gateway_Telegraph_Hackathon_PRD.md](docs/KYA_Gateway_Telegraph_Hackathon_PRD.md)
+**Hosted demo:** https://kya-gateway.irale.dev · PRD: [docs/KYA_Gateway_Telegraph_Hackathon_PRD.md](docs/KYA_Gateway_Telegraph_Hackathon_PRD.md)
 
 ## Quick start
 
@@ -96,3 +96,7 @@ make cover       # coverage of authorization/decision packages (currently 85%)
 ```
 
 Every row of PRD §16's testing matrix has an automated test in `internal/service/verify_test.go`, including concurrent replay, parallel cumulative-budget exhaustion and prompt-injected provider output.
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).

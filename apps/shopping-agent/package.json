@@ -1,5 +1,6 @@
 {
   "name": "@kya/shopping-agent",
+  "license": "Apache-2.0",
   "private": true,
   "type": "module",
   "description": "CLI shopping agent: registers a key, obtains a delegation, signs purchase intents and checks out at the demo merchant",

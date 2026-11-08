@@ -1,5 +1,6 @@
 {
   "name": "@kya/sdk",
+  "license": "Apache-2.0",
   "version": "0.1.0",
   "description": "KYA Gateway client: agent keys, signed purchase intents, delegation and merchant verification",
   "type": "module",
