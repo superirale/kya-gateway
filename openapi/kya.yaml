@@ -1,0 +1,295 @@
+openapi: 3.1.0
+info:
+  title: KYA Gateway API
+  version: 1.0.0
+  description: |
+    Merchant-side trust and authorization for agent-initiated commerce.
+
+    **Decision semantics.** A well-formed verification request returns HTTP 200 with
+    `decision` ALLOW | REVIEW | DENY, even when the decision is DENY. Exceptions:
+    a replayed nonce/intent_id returns HTTP **409** with a DENY body; a request
+    addressed to a different merchant than the caller returns **403**.
+    When paid intelligence is unavailable or unverified, KYA fails closed with
+    REVIEW (default) or DENY (strict policy). It never ALLOWs.
+
+    **Signing.** Every signature is Ed25519 over `"<DOMAIN>\n" + canonical_json(payload)`.
+    Canonical JSON: keys sorted, no whitespace, minimal escaping, integers only
+    (|n| ≤ 2^53−1), empty optional fields omitted. Domains:
+    `KYA-AGENT-CHALLENGE-V1`, `KYA-AGENT-ROTATE-V1`, `KYA-DELEGATION-V1`,
+    `KYA-PURCHASE-INTENT-V1`. Test vectors: `testdata/signing-vectors.json`.
+
+    **Trust boundary.** A valid agent signature proves key control, not the
+    operator's real-world identity. Demo consumer auth is synthetic.
+servers:
+  - url: http://localhost:8080
+components:
+  securitySchemes:
+    merchantKey: { type: http, scheme: bearer, description: Merchant API key }
+    consumerSession: { type: http, scheme: bearer, description: Demo consumer session token (cs_...) }
+    adminKey: { type: http, scheme: bearer }
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties: { code: { type: string }, message: { type: string } }
+    Challenge:
+      type: object
+      properties:
+        challenge_id: { type: string }
+        challenge: { type: string, description: base64url random 32 bytes }
+        purpose: { enum: [register, rotate] }
+        expires_at: { type: string, format: date-time }
+        signing_domain: { type: string }
+    Agent:
+      type: object
+      properties:
+        agent_id: { type: string }
+        developer_label: { type: string }
+        status: { enum: [active, disabled] }
+        key_version: { type: integer }
+        public_key: { type: string }
+        key_fingerprint: { type: string }
+        created_at: { type: string, format: date-time }
+        identity_note: { type: string }
+    DelegationRequest:
+      type: object
+      required: [agent_id, merchant_id, actions, max_amount_minor, currency]
+      additionalProperties: false
+      properties:
+        agent_id: { type: string, pattern: '^[a-z0-9][a-z0-9_\-]{2,63}$' }
+        merchant_id: { type: string }
+        actions: { type: array, items: { enum: [purchase] } }
+        max_amount_minor: { type: integer, minimum: 1, description: Per-transaction limit }
+        cumulative_limit_minor: { type: integer, description: Optional total across transactions (atomically reserved) }
+        categories: { type: array, items: { type: string } }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        expires_at: { type: string, format: date-time }
+        expires_in_seconds: { type: integer, maximum: 86400 }
+    Delegation:
+      type: object
+      properties:
+        delegation_id: { type: string }
+        claims: { type: object, description: Exactly the object signed under KYA-DELEGATION-V1 }
+        signed_payload: { type: object }
+        signature: { type: string }
+        revoked_at: { type: [string, 'null'], format: date-time }
+        spent_minor: { type: integer }
+    PurchaseIntent:
+      type: object
+      required: [intent_id, action, amount_minor, currency, cart_digest, timestamp, nonce]
+      additionalProperties: false
+      properties:
+        intent_id: { type: string, pattern: '^[A-Za-z0-9_\-]{3,64}$' }
+        action: { type: string, example: purchase }
+        amount_minor: { type: integer, minimum: 1, example: 35000 }
+        currency: { type: string, example: USD }
+        cart_digest: { type: string, pattern: '^sha256:[0-9a-f]{64}$' }
+        category: { type: string }
+        timestamp: { type: string, description: 'RFC 3339 UTC, no fractional seconds; within ±clock skew', example: '2026-11-08T15:00:00Z' }
+        nonce: { type: string, pattern: '^[A-Za-z0-9_\-]{16,128}$' }
+    VerifyRequest:
+      type: object
+      required: [agent_id, merchant_id, delegation_id, intent, signature]
+      additionalProperties: false
+      properties:
+        agent_id: { type: string }
+        merchant_id: { type: string, description: Must equal the authenticated merchant }
+        delegation_id: { type: string }
+        intent: { $ref: '#/components/schemas/PurchaseIntent' }
+        signature: { type: string, description: 'base64url Ed25519 over KYA-PURCHASE-INTENT-V1 + canonical({agent_id, merchant_id, delegation_id, intent})' }
+    TraceStep:
+      type: object
+      properties:
+        step: { enum: [agent_signature, nonce, intent_timestamp, delegation, spend_reservation, telegraph_purchase, receipt_verification, policy_decision] }
+        status: { enum: [pass, fail, warn, skipped] }
+        reason: { type: string }
+        detail: { type: string }
+        duration_ms: { type: integer }
+    Telegraph:
+      type: [object, 'null']
+      description: Only fields actually observed from the network are non-null.
+      properties:
+        network: { type: string, example: 'eip155:11155111' }
+        intent: { type: string, example: FRAUD_RISK_GENERAL }
+        simulated: { type: boolean }
+        settlement_status: { enum: [REQUESTED, SETTLED, FAILED, UNVERIFIED] }
+        request_id: { type: [string, 'null'], description: Telegraph signal_hash }
+        receipt_id: { type: [string, 'null'], description: receipt_hash from X-TELEGRAPH-RECEIPT }
+        tx_hash: { type: [string, 'null'] }
+        explorer_url: { type: [string, 'null'] }
+        provider_id: { type: [string, 'null'] }
+        observed_cost:
+          type: [object, 'null']
+          properties: { amount_minor: { type: integer }, currency: { type: string }, decimals: { type: integer } }
+        latency_ms: { type: [integer, 'null'] }
+        error_code: { type: [string, 'null'] }
+        risk_level: { type: [string, 'null'] }
+        risk_score: { type: [number, 'null'] }
+        verification_note: { type: string }
+    Verification:
+      type: object
+      properties:
+        verification_id: { type: string }
+        decision: { enum: [ALLOW, REVIEW, DENY] }
+        reason_codes:
+          type: array
+          items:
+            enum: [AGENT_SIGNATURE_VALID, DELEGATION_VALID, NONCE_UNIQUE, RISK_ACCEPTABLE, RISK_ELEVATED_REVIEW, RISK_ABOVE_THRESHOLD,
+              INVALID_AGENT_SIGNATURE, AGENT_NOT_REGISTERED, AGENT_DISABLED, DELEGATION_NOT_FOUND, DELEGATION_SIGNATURE_INVALID,
+              DELEGATION_EXPIRED, DELEGATION_NOT_YET_VALID, DELEGATION_REVOKED, DELEGATION_AGENT_MISMATCH, DELEGATION_AUDIENCE_INVALID,
+              MERCHANT_NOT_ALLOWED, ACTION_NOT_ALLOWED, CATEGORY_NOT_ALLOWED, AMOUNT_EXCEEDS_DELEGATION, CURRENCY_MISMATCH,
+              CUMULATIVE_LIMIT_EXCEEDED, NONCE_REPLAY, INTENT_TIMESTAMP_OUT_OF_WINDOW, TELEGRAPH_SETTLEMENT_UNVERIFIED,
+              RISK_INTELLIGENCE_UNAVAILABLE, RISK_INTELLIGENCE_SIMULATED, RISK_RESULT_UNRECOGNIZED, TELEGRAPH_SPEND_CAP_REACHED]
+        explanation: { type: array, items: { type: string } }
+        policy_version: { type: string }
+        evidence_id: { type: string }
+        evidence_hash: { type: string }
+        intent_hash: { type: string }
+        telegraph_called: { type: boolean }
+        trace: { type: array, items: { $ref: '#/components/schemas/TraceStep' } }
+        telegraph: { $ref: '#/components/schemas/Telegraph' }
+        mode: { enum: [local, competition] }
+        created_at: { type: string, format: date-time }
+  responses:
+    Error: { description: Error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+paths:
+  /healthz:
+    get: { summary: Liveness, responses: { '200': { description: ok } } }
+  /readyz:
+    get: { summary: Readiness (database), responses: { '200': { description: ready }, '503': { description: not ready } } }
+  /v1/public/status:
+    get:
+      summary: Public deployment status (mode, Telegraph adapter/network/intent, spend cap). No secrets.
+      responses: { '200': { description: status } }
+  /v1/agents/challenge:
+    post:
+      summary: Issue a single-use proof-of-possession challenge (5 min TTL)
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, required: [agent_id], properties: { agent_id: { type: string }, purpose: { enum: [register, rotate] } } }
+      responses:
+        '201': { description: challenge, content: { application/json: { schema: { $ref: '#/components/schemas/Challenge' } } } }
+        '422': { $ref: '#/components/responses/Error' }
+  /v1/agents/register:
+    post:
+      summary: Register an agent public key by signing the challenge
+      description: 'signed_challenge = Ed25519(KYA-AGENT-CHALLENGE-V1 + canonical({agent_id, challenge_id, challenge, public_key}))'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agent_id, public_key, challenge_id, signed_challenge]
+              properties:
+                agent_id: { type: string }
+                developer_label: { type: string }
+                public_key: { type: string, description: base64url 32-byte Ed25519 key }
+                challenge_id: { type: string }
+                signed_challenge: { type: string }
+      responses:
+        '201': { description: registered, content: { application/json: { schema: { $ref: '#/components/schemas/Agent' } } } }
+        '401': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /v1/agents/{agent_id}:
+    get:
+      parameters: [{ name: agent_id, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: agent, content: { application/json: { schema: { $ref: '#/components/schemas/Agent' } } } }, '404': { $ref: '#/components/responses/Error' } }
+  /v1/agents/{agent_id}/rotate-key:
+    post:
+      summary: Rotate the agent key (signed by BOTH current and new key)
+      description: 'Both signatures cover KYA-AGENT-ROTATE-V1 + canonical({agent_id, challenge_id, challenge, old_key_version, new_public_key}); challenge purpose=rotate.'
+      parameters: [{ name: agent_id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_public_key, challenge_id, old_key_signature, new_key_signature]
+              properties: { new_public_key: { type: string }, challenge_id: { type: string }, old_key_signature: { type: string }, new_key_signature: { type: string } }
+      responses: { '200': { description: rotated }, '401': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
+  /v1/agents/{agent_id}/disable:
+    post:
+      security: [{ adminKey: [] }]
+      parameters: [{ name: agent_id, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: disabled } }
+  /v1/agents/{agent_id}/enable:
+    post:
+      security: [{ adminKey: [] }]
+      parameters: [{ name: agent_id, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: enabled } }
+  /v1/consumers/login:
+    post:
+      summary: Demo consumer login (synthetic accounts; NOT identity proofing)
+      requestBody:
+        content: { application/json: { schema: { type: object, properties: { username: { type: string }, password: { type: string } } } } }
+      responses: { '200': { description: session token }, '401': { $ref: '#/components/responses/Error' } }
+  /v1/delegations:
+    post:
+      security: [{ consumerSession: [] }]
+      summary: Create a short-lived signed delegation for an agent
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/DelegationRequest' } } } }
+      responses:
+        '201': { description: created, content: { application/json: { schema: { $ref: '#/components/schemas/Delegation' } } } }
+        '422': { $ref: '#/components/responses/Error' }
+    get:
+      security: [{ consumerSession: [] }]
+      summary: List the consumer's delegations
+      responses: { '200': { description: list } }
+  /v1/delegations/{id}/revoke:
+    post:
+      security: [{ consumerSession: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: revoked }, '404': { $ref: '#/components/responses/Error' } }
+  /v1/verify-transactions:
+    post:
+      security: [{ merchantKey: [] }]
+      summary: Verify a signed purchase intent and return an explainable decision
+      description: |
+        Order: schema → merchant auth → agent signature/status → atomic nonce → timestamp →
+        delegation (issuer signature, expiry, revocation, scope, amount) → atomic cumulative
+        reservation → paid Telegraph intelligence → receipt verification → versioned policy.
+        Any local failure is DENY with no intelligence purchase.
+      parameters:
+        - { name: X-KYA-Simulate, in: header, required: false, schema: { enum: [high_risk, critical_risk, unavailable, prompt_injection] }, description: 'Local mode + simulated adapter only; ignored otherwise.' }
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/VerifyRequest' } } } }
+      responses:
+        '200': { description: decision, content: { application/json: { schema: { $ref: '#/components/schemas/Verification' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { description: Nonce replay (DENY body), content: { application/json: { schema: { $ref: '#/components/schemas/Verification' } } } }
+        '422': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+  /v1/verifications:
+    get:
+      security: [{ merchantKey: [] }]
+      parameters: [{ name: limit, in: query, schema: { type: integer, maximum: 500 } }]
+      responses: { '200': { description: recent verifications for the caller } }
+  /v1/verifications/{id}:
+    get:
+      security: [{ merchantKey: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: verification, content: { application/json: { schema: { $ref: '#/components/schemas/Verification' } } } }, '404': { $ref: '#/components/responses/Error' } }
+  /v1/verifications/{id}/evidence:
+    get:
+      security: [{ merchantKey: [] }]
+      summary: Hashed evidence document (recomputed hash_matches), trace and full Telegraph record
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: evidence } }
+  /v1/stats:
+    get:
+      security: [{ merchantKey: [] }]
+      summary: Decision counts, reasons, Telegraph calls/errors/spend/latency
+      responses: { '200': { description: stats } }
+  /v1/audit:
+    get:
+      security: [{ merchantKey: [] }]
+      responses: { '200': { description: the caller's audit events (hash-chained) } }
+  /v1/audit/verify:
+    get:
+      security: [{ merchantKey: [] }]
+      summary: Verify the full audit hash chain
+      responses: { '200': { description: '{events, intact, head_hash | first_broken_seq}' } }

@@ -1,0 +1,49 @@
+{
+  "secret_key_seed": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+  "public_key": "A6EHv_POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg",
+  "canonical_input": {
+    "z": 1,
+    "a": [
+      true,
+      null,
+      -5
+    ],
+    "s": "line\nquote\"tab\tctl\u0001 é ✓ \u003c\u0026\u003e",
+    "n": {
+      "b": "2",
+      "a": "1"
+    }
+  },
+  "canonical_output": "{\"a\":[true,null,-5],\"n\":{\"a\":\"1\",\"b\":\"2\"},\"s\":\"line\\nquote\\\"tab\\tctl\\u0001 é ✓ \u003c\u0026\u003e\",\"z\":1}",
+  "intent": {
+    "agent_id": "agent_vector_001",
+    "merchant_id": "merchant_demo_001",
+    "delegation_id": "dlg_vector",
+    "intent": {
+      "intent_id": "pi_vector",
+      "action": "purchase",
+      "amount_minor": 35000,
+      "currency": "USD",
+      "cart_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "category": "electronics",
+      "timestamp": "2026-11-08T15:00:00Z",
+      "nonce": "AAAAAAAAAAAAAAAAAAAAAA"
+    }
+  },
+  "intent_message": "KYA-PURCHASE-INTENT-V1\n{\"agent_id\":\"agent_vector_001\",\"delegation_id\":\"dlg_vector\",\"intent\":{\"action\":\"purchase\",\"amount_minor\":35000,\"cart_digest\":\"sha256:0000000000000000000000000000000000000000000000000000000000000000\",\"category\":\"electronics\",\"currency\":\"USD\",\"intent_id\":\"pi_vector\",\"nonce\":\"AAAAAAAAAAAAAAAAAAAAAA\",\"timestamp\":\"2026-11-08T15:00:00Z\"},\"merchant_id\":\"merchant_demo_001\"}",
+  "intent_signature": "C8O-x-unAUyYedLISX0ZA0NCcHev6fhlEnJlFVs-pro0Hph6OtXzzPvGxQWtpu695tdTeoxP9vxM1GZaO-rUDw",
+  "intent_hash": "sha256:6d73222d9fb2c1895be290c0031d97d01765116ed6a0f36fb1c1d99fad5f6237",
+  "cart": {
+    "merchant_id": "merchant_demo_001",
+    "items": [
+      {
+        "sku": "sku_headphones_nc",
+        "quantity": 1,
+        "unit_price_minor": 35000
+      }
+    ],
+    "currency": "USD",
+    "total_minor": 35000
+  },
+  "cart_digest": "sha256:5ab577ad5f359371676168286f1e3f4cf0c06f7efef04402a5be09baaa8014d7"
+}
