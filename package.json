@@ -1,0 +1,12 @@
+{
+  "name": "kya-gateway",
+  "private": true,
+  "workspaces": ["sdk/typescript", "apps/dashboard", "apps/shopping-agent"],
+  "scripts": {
+    "build": "npm run build -w sdk/typescript && npm run build -w apps/dashboard",
+    "test": "npm test -w sdk/typescript",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev:dashboard": "npm run dev -w apps/dashboard",
+    "agent": "npm run start -w apps/shopping-agent --"
+  }
+}

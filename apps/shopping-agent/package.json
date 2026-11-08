@@ -1,0 +1,18 @@
+{
+  "name": "@kya/shopping-agent",
+  "private": true,
+  "type": "module",
+  "description": "CLI shopping agent: registers a key, obtains a delegation, signs purchase intents and checks out at the demo merchant",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@kya/sdk": "0.1.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.0",
+    "typescript": "~5.9.3",
+    "@types/node": "^24.0.0"
+  }
+}
